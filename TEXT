@@ -1,0 +1,71 @@
+erDiagram
+    COUNTERPARTIES {
+        int id PK
+        string name
+        string inn
+        string address
+        string phone
+        boolean is_buyer
+        boolean is_supplier
+    }
+    NOMENCLATURE {
+        int id PK
+        string code
+        string full_name
+        string unit
+        string type
+    }
+    PRICES {
+        int id PK
+        int nomenclature_id FK
+        decimal price
+        date valid_from
+    }
+    SPECIFICATIONS {
+        int id PK
+        int product_id FK
+        string spec_name
+        string manufacturer
+    }
+    SPECIFICATION_ITEMS {
+        int id PK
+        int specification_id FK
+        int material_id FK
+        decimal quantity
+    }
+    ORDERS {
+        int id PK
+        string order_number
+        date order_date
+        int customer_id FK
+    }
+    ORDER_ITEMS {
+        int id PK
+        int order_id FK
+        int product_id FK
+        int quantity
+        decimal unit_price
+    }
+    PRODUCTION_ACTS {
+        int id PK
+        string act_number
+        date act_date
+        int product_id FK
+        decimal produced_quantity
+    }
+    PRODUCTION_MATERIALS {
+        int id PK
+        int production_act_id FK
+        int material_id FK
+        decimal actual_quantity
+    }
+
+    COUNTERPARTIES ||--o{ ORDERS : "размещает"
+    ORDERS ||--|{ ORDER_ITEMS : "содержит"
+    NOMENCLATURE ||--o{ ORDER_ITEMS : "включается_в_заказ"
+    NOMENCLATURE ||--o{ PRICES : "имеет_стоимость"
+    NOMENCLATURE ||--o{ SPECIFICATIONS : "производится_по"
+    SPECIFICATIONS ||--|{ SPECIFICATION_ITEMS : "состоит_из"
+    NOMENCLATURE ||--o{ SPECIFICATION_ITEMS : "используется_как_сырье"
+    NOMENCLATURE ||--o{ PRODUCTION_ACTS : "выпускается_через"
+    PRODUCTION_ACTS ||--|{ PRODUCTION_MATERIALS : "списывает"
