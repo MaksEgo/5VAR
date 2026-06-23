@@ -1,0 +1,21 @@
+SELECT 
+    o.id AS [ID Заказа],
+    o.order_number AS [Номер Заказа],
+    o.order_date AS [Дата Заказа],
+    c.name AS [Покупатель],
+    -- Вычисляем сумму материальных затрат на весь заказ
+    SUM(oi.quantity * si.quantity * p.price) AS [Полная стоимость материалов]
+FROM Orders o
+JOIN Counterparties c ON o.customer_id = c.id
+JOIN OrderItems oi ON o.id = oi.order_id
+JOIN Specifications s ON oi.product_id = s.product_id
+JOIN SpecificationItems si ON s.id = si.specification_id
+CROSS APPLY (
+    -- Ищем одну последнюю цену для материала, которая меньше или равна дате заказа
+    SELECT TOP 1 pr.price 
+    FROM Prices pr 
+    WHERE pr.nomenclature_id = si.material_id 
+      AND pr.valid_from <= o.order_date
+    ORDER BY pr.valid_from DESC
+) p
+GROUP BY o.id, o.order_number, o.order_date, c.name;
