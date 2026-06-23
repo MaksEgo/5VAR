@@ -1,0 +1,111 @@
+-- Шаг 0. Удаление таблиц, если они уже существовали (для перезапуска скрипта)
+DROP TABLE IF EXISTS ProductionMaterials;
+DROP TABLE IF EXISTS ProductionActs;
+DROP TABLE IF EXISTS OrderItems;
+DROP TABLE IF EXISTS Orders;
+DROP TABLE IF EXISTS SpecificationItems;
+DROP TABLE IF EXISTS Specifications;
+DROP TABLE IF EXISTS Prices;
+DROP TABLE IF EXISTS Nomenclature;
+DROP TABLE IF EXISTS Counterparties;
+GO
+
+-- 1. Таблица Контрагентов (Заказчики / Поставщики)
+-- Поле id создается без IDENTITY, так как мы импортируем готовые уникальные ID из файла
+CREATE TABLE Counterparties (
+    id INT PRIMARY KEY,
+    name NVARCHAR(255) NOT NULL,
+    inn VARCHAR(12) NULL,
+    address NVARCHAR(500) NULL,
+    phone VARCHAR(20) NULL,
+    is_salesman BIT NOT NULL DEFAULT 0, -- Исходное поле 'salesman'
+    is_buyer BIT NOT NULL DEFAULT 0 -- Исходное поле 'buyer'
+);
+
+-- 2. Универсальный справочник Номенклатуры (Товары, Сырье, Полуфабрикаты)
+CREATE TABLE Nomenclature (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    code VARCHAR(50) NULL,
+    full_name NVARCHAR(255) NOT NULL,
+    unit NVARCHAR(20) NULL,
+    type NVARCHAR(50) NOT NULL -- Принимает значения: 'Товар', 'Материал', 'Полуфабрикат'
+);
+
+-- 3. История цен номенклатуры (срез цен по датам)
+CREATE TABLE Prices (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    nomenclature_id INT NOT NULL,
+    price DECIMAL(18,2) NOT NULL,
+    valid_from DATE NOT NULL,
+    CONSTRAINT FK_Prices_Nomenclature FOREIGN KEY (nomenclature_id) 
+        REFERENCES Nomenclature(id) ON DELETE CASCADE
+);
+
+-- 4. Спецификации (Технологические карты — Шапка документа)
+CREATE TABLE Specifications (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    product_id INT NOT NULL,
+    spec_name NVARCHAR(255) NOT NULL,
+    manufacturer NVARCHAR(255) NULL,
+    CONSTRAINT FK_Specifications_Nomenclature FOREIGN KEY (product_id) 
+        REFERENCES Nomenclature(id) ON DELETE REJECT
+);
+
+-- 5. Состав спецификаций (Ингредиенты рецепта — Табличная часть)
+CREATE TABLE SpecificationItems (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    specification_id INT NOT NULL,
+    material_id INT NOT NULL,
+    quantity DECIMAL(18,4) NOT NULL, -- Норма расхода материала
+    CONSTRAINT FK_SpecItems_Specifications FOREIGN KEY (specification_id) 
+        REFERENCES Specifications(id) ON DELETE CASCADE,
+    CONSTRAINT FK_SpecItems_Nomenclature FOREIGN KEY (material_id) 
+        REFERENCES Nomenclature(id)
+);
+
+-- 6. Заказы покупателей (Шапка документа)
+CREATE TABLE Orders (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    order_number NVARCHAR(50) NOT NULL,
+    order_date DATE NOT NULL,
+    customer_id INT NOT NULL,
+    CONSTRAINT FK_Orders_Counterparties FOREIGN KEY (customer_id) 
+        REFERENCES Counterparties(id)
+);
+
+-- 7. Позиции заказа (Табличная часть)
+CREATE TABLE OrderItems (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(18,2) NOT NULL,
+    CONSTRAINT FK_OrderItems_Orders FOREIGN KEY (order_id) 
+        REFERENCES Orders(id) ON DELETE CASCADE,
+    CONSTRAINT FK_OrderItems_Nomenclature FOREIGN KEY (product_id) 
+        REFERENCES Nomenclature(id)
+);
+
+-- 8. Акты производства (Шапка документа выпуска продукции)
+CREATE TABLE ProductionActs (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    act_number NVARCHAR(50) NOT NULL,
+    act_date DATE NOT NULL,
+    product_id INT NOT NULL,
+    produced_quantity DECIMAL(18,4) NOT NULL,
+    CONSTRAINT FK_ProductionActs_Nomenclature FOREIGN KEY (product_id) 
+        REFERENCES Nomenclature(id)
+);
+
+-- 9. Списание материалов под конкретный акт производства (Табличная часть)
+CREATE TABLE ProductionMaterials (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    production_act_id INT NOT NULL,
+    material_id INT NOT NULL,
+    actual_quantity DECIMAL(18,4) NOT NULL, -- Фактически списанный объем сырья
+    CONSTRAINT FK_ProdMaterials_ProductionActs FOREIGN KEY (production_act_id) 
+        REFERENCES ProductionActs(id) ON DELETE CASCADE,
+    CONSTRAINT FK_ProdMaterials_Nomenclature FOREIGN KEY (material_id) 
+        REFERENCES Nomenclature(id)
+);
+GO
